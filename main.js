@@ -20,6 +20,7 @@ const DEFAULT_SETTINGS = {
   openaiKey: '',
   openaiModel: 'gpt-image-2.5-sunburst',
   openaiQuality: 'high',
+  pexelsKey: '',
   imageModel: 'black-forest-labs/flux.1-schnell',
   textModel: 'llama-3.3-70b-versatile',
   brand: 'Apologea',
@@ -146,7 +147,7 @@ function queueImage(fn) {
   imageChain = run.catch(() => {});
   return run;
 }
-async function generateImage({ prompt, seed, width = 1024, height = 1024, provider: wanted }) {
+async function generateImage({ prompt, seed, width = 1024, height = 1024, provider: wanted, photo = false }) {
   const s = loadSettings();
   seed = seed ?? Math.floor(Math.random() * 1e9);
   const provider = wanted || s.imageProvider || 'cloudflare';
@@ -157,7 +158,10 @@ async function generateImage({ prompt, seed, width = 1024, height = 1024, provid
     const res = await fetchWithTimeout('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: { Authorization: `Bearer ${s.openaiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: s.openaiModel || DEFAULT_SETTINGS.openaiModel, prompt: p, size: '1024x1024', quality: s.openaiQuality || 'high', background: 'transparent', output_format: 'png', n: 1 }),
+      // photo = Foto zum Einblenden im Video (hochkant, mit Hintergrund)
+      body: JSON.stringify(photo
+        ? { model: s.openaiModel || DEFAULT_SETTINGS.openaiModel, prompt, size: '1024x1536', quality: s.openaiQuality || 'high', background: 'opaque', output_format: 'jpeg', n: 1 }
+        : { model: s.openaiModel || DEFAULT_SETTINGS.openaiModel, prompt: p, size: '1024x1024', quality: s.openaiQuality || 'high', background: 'transparent', output_format: 'png', n: 1 }),
     }, 300000);
     if (!res.ok) {
       const t = await errorText(res);
@@ -167,7 +171,7 @@ async function generateImage({ prompt, seed, width = 1024, height = 1024, provid
     const data = await res.json();
     const b64 = data.data?.[0]?.b64_json;
     if (!b64) throw new Error('OpenAI lieferte kein Bild');
-    return { buf: Buffer.from(b64, 'base64'), type: 'image/png' };
+    return { buf: Buffer.from(b64, 'base64'), type: photo ? 'image/jpeg' : 'image/png' };
   }
   if (provider === 'cloudflare') {
     if (!s.cfAccountId || !s.cfToken) throw new Error('Für die Bild-KI fehlen Cloudflare-Konto-ID und Token (Einstellungen).');
@@ -212,6 +216,34 @@ ipcMain.handle('img:generate', (_e, args) => queueImage(async () => {
   const { buf, type } = await generateImage(args);
   return `data:${type};base64,${buf.toString('base64')}`;
 }));
+
+// ---------- Stockfotos (Pexels: kostenlos, auch für Werbung erlaubt) ----------
+ipcMain.handle('stock:search', async (_e, { query, orientation = 'portrait', page = 1 }) => {
+  const s = loadSettings();
+  if (!s.pexelsKey) throw new Error('Für die Fotosuche fehlt der kostenlose Pexels-Schlüssel (Einstellungen).');
+  const params = new URLSearchParams({ query, per_page: '15', page: String(page) });
+  if (orientation) params.set('orientation', orientation);
+  const res = await fetchWithTimeout(`https://api.pexels.com/v1/search?${params}`, { headers: { Authorization: s.pexelsKey } }, 30000);
+  if (!res.ok) throw new Error('Pexels: ' + (await errorText(res)));
+  const data = await res.json();
+  return (data.photos || []).map((p) => ({
+    id: p.id, width: p.width, height: p.height, alt: p.alt || '', photographer: p.photographer || '',
+    thumb: p.src?.medium || p.src?.small, original: p.src?.original, page: p.url,
+  }));
+});
+ipcMain.handle('stock:fetch', async (_e, photo) => {
+  const dir = path.join(app.getPath('userData'), 'media');
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, `pexels-${Number(photo.id) || Date.now()}.jpg`);
+  if (!fs.existsSync(file)) {
+    // Groß genug für 4K-Vollbild, aber nicht die riesige Originaldatei
+    const size = photo.height >= photo.width ? 'w=2400' : 'h=3400';
+    const res = await fetchWithTimeout(`${photo.original}?auto=compress&cs=tinysrgb&${size}`, {}, 120000);
+    if (!res.ok) throw new Error('Foto konnte nicht geladen werden: ' + res.status);
+    fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+  }
+  return file;
+});
 
 // ---------- Dateien & Projekte ----------
 ipcMain.handle('settings:get', () => ({ ...loadSettings(), resolvedOutputDir: outputDir() }));
@@ -300,8 +332,10 @@ function runFfmpeg(args, { cwd, onProgress } = {}) {
 async function probe(file) {
   const out = await runFfmpeg(['-i', file, '-f', 'null', '-t', '0.01', '-']).catch((e) => e.message);
   const dur = out.match(/Duration: (\d+):(\d+):(\d+\.\d+)/);
-  const vid = out.match(/Stream #\d+:\d+.*?: Video: .*?(\d{2,5})x(\d{2,5})/);
-  const fps = out.match(/(\d+(?:\.\d+)?) fps/);
+  // Erste echte Videospur (eingebettete Vorschaubilder = "attached pic" überspringen)
+  const vLine = out.split('\n').find((l) => /Stream #\d+:\d+.*?: Video: /.test(l) && !/attached pic/.test(l)) || '';
+  const vid = vLine.match(/, (\d{2,5})x(\d{2,5})/);
+  const fps = vLine.match(/(\d+(?:\.\d+)?) fps/);
   const rot = out.match(/rotate\s*:\s*(-?\d+)|rotation of (-?\d+(?:\.\d+)?)/);
   let width = vid ? +vid[1] : 1080, height = vid ? +vid[2] : 1920;
   const r = rot ? Math.abs(Math.round(+(rot[1] ?? rot[2]))) : 0;
@@ -310,10 +344,21 @@ async function probe(file) {
     duration: dur ? +dur[1] * 3600 + +dur[2] * 60 + +dur[3] : 0,
     width, height, fps: fps ? +fps[1] : 30,
     hasAudio: /Stream #\d+:\d+.*?: Audio:/.test(out),
+    hdr: /arib-std-b67/.test(vLine) ? 'hlg' : /smpte2084/.test(vLine) ? 'pq' : null,
   };
 }
 ipcMain.handle('video:probe', (_e, file) => probe(file));
 
+// Lautstärke (RMS) in 10-ms-Schritten aus 8-kHz-16-Bit-Mono
+function envelope(buf) {
+  const n = Math.floor(buf.length / 2), step = 80, out = [];
+  for (let i = 0; i + step <= n; i += step) {
+    let sum = 0;
+    for (let k = 0; k < step; k++) { const v = buf.readInt16LE((i + k) * 2) / 32768; sum += v * v; }
+    out.push(Math.round(Math.sqrt(sum / step) * 10000) / 10000);
+  }
+  return out;
+}
 function workDir() {
   const d = path.join(os.tmpdir(), 'apologea-studio', String(Date.now()));
   fs.mkdirSync(d, { recursive: true });
@@ -328,7 +373,10 @@ ipcMain.handle('video:analyze', async (_e, { file, silenceDb = -35, language }) 
   const dir = workDir();
   const audio = path.join(dir, 'audio.mp3');
   send('video:status', { step: 'Ton wird vorbereitet …', progress: 0.05 });
-  const log = await runFfmpeg(['-y', '-i', file, '-vn', '-ac', '1', '-ar', '16000', '-af', `silencedetect=noise=${silenceDb}dB:d=0.25`, '-b:a', '32k', audio], {
+  const raw = path.join(dir, 'env.raw');
+  // Zweite Ausgabe: roher Ton (8 kHz) für die Lautstärke-Hüllkurve, mit der die Schnitte in leise Stellen gelegt werden
+  const log = await runFfmpeg(['-y', '-i', file, '-vn', '-ac', '1', '-ar', '16000', '-af', `silencedetect=noise=${silenceDb}dB:d=0.25`, '-b:a', '32k', audio,
+    '-vn', '-ac', '1', '-ar', '8000', '-f', 's16le', raw], {
     onProgress: (t) => info.duration && send('video:status', { step: 'Ton wird vorbereitet …', progress: 0.05 + 0.25 * Math.min(1, t / info.duration) }),
   });
   const silences = [];
@@ -340,6 +388,7 @@ ipcMain.handle('video:analyze', async (_e, { file, silenceDb = -35, language }) 
     if (b && open !== null) { silences.push([open, +b[1]]); open = null; }
   }
   if (open !== null) silences.push([open, info.duration]);
+  const env = envelope(fs.readFileSync(raw));
   const size = fs.statSync(audio).size;
   if (size > 24 * 1024 * 1024) throw new Error('Das Video ist zu lang für die kostenlose Spracherkennung (max. ca. 90 Minuten).');
   send('video:status', { step: 'KI hört zu und schreibt mit …', progress: 0.4 });
@@ -358,33 +407,63 @@ ipcMain.handle('video:analyze', async (_e, { file, silenceDb = -35, language }) 
   const data = await res.json();
   fs.rmSync(dir, { recursive: true, force: true });
   send('video:status', { step: 'Fertig analysiert', progress: 1 });
-  return { info, silences, words: (data.words || []).map((w) => ({ word: String(w.word).trim(), start: w.start, end: w.end })), text: data.text };
+  return { info, silences, env, words: (data.words || []).map((w) => ({ word: String(w.word).trim(), start: w.start, end: w.end })), text: data.text };
 });
 
 ipcMain.handle('video:render', async (_e, job) => {
-  const { file, info, segments, ass, filter, overlays = [], outName } = job;
+  const { file, info, segments, ass, filter, overlays = [], outName, quality = 'hd', subdir } = job;
   const dir = workDir();
   fs.mkdirSync(path.join(dir, 'fonts'));
   for (const f of fs.readdirSync(path.join(ASSETS, 'fonts'))) fs.copyFileSync(path.join(ASSETS, 'fonts', f), path.join(dir, 'fonts', f));
   if (ass) fs.writeFileSync(path.join(dir, 'subs.ass'), ass, 'utf8');
   fs.writeFileSync(path.join(dir, 'filter.txt'), filter, 'utf8');
-  const outDir = path.join(outputDir(), 'Videos');
+  const outDir = subdir ? path.join(outputDir(), 'Videos', safeName(subdir)) : path.join(outputDir(), 'Videos');
   fs.mkdirSync(outDir, { recursive: true });
   const out = path.join(outDir, `${safeName(outName)}.mp4`);
   const args = ['-y', '-i', file];
   for (const o of overlays) {
     let src = o.path;
-    if (o.asset) src = path.join(ASSETS, o.asset);
+    // FFmpeg kann nicht in app.asar hineinschauen, deshalb das Logo erst in den Arbeitsordner kopieren
+    if (o.asset) { src = path.join(dir, path.basename(o.asset)); fs.copyFileSync(path.join(ASSETS, o.asset), src); }
     if (o.dataUrl) { src = path.join(dir, `ov${args.length}.png`); fs.writeFileSync(src, dataUrlToBuffer(o.dataUrl)); }
-    args.push('-loop', '1', '-t', String(o.duration), '-i', src);
+    // Das Wasserzeichen läuft als Endlosbild mit, eingeblendete Bilder kommen als Einzelbild (Bewegung macht der Filter)
+    if (o.loop) args.push('-loop', '1', '-t', String(o.duration));
+    args.push('-i', src);
   }
   args.push('-filter_complex_script', 'filter.txt', '-map', '[vout]');
-  if (info.hasAudio) args.push('-map', '[aout]', '-c:a', 'aac', '-b:a', '160k');
-  args.push('-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', out);
+  if (info.hasAudio) args.push('-map', '[aout]', '-c:a', 'aac', '-b:a', '256k', '-ar', '48000');
+  args.push('-c:v', 'libx264', '-preset', 'medium', '-crf', quality === 'max' ? '18' : '17', '-profile:v', 'high',
+    '-pix_fmt', 'yuv420p', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
+    '-movflags', '+faststart', out);
   const total = segments.reduce((a, s) => a + (s[1] - s[0]), 0);
   await runFfmpeg(args, { cwd: dir, onProgress: (t) => send('video:status', { step: 'Video wird geschnitten …', progress: Math.min(0.99, t / total) }) });
   fs.rmSync(dir, { recursive: true, force: true });
   send('video:status', { step: 'Fertig!', progress: 1 });
   return out;
+});
+// CapCut-Paket fertigstellen: Untertitel + Bilder neben das Video legen, Ordner öffnen, CapCut starten
+ipcMain.handle('capcut:finish', async (_e, { video, srt, images = [] }) => {
+  const dir = path.dirname(video);
+  fs.writeFileSync(path.join(dir, 'Untertitel.srt'), srt, 'utf8');
+  const lines = ['Bilder zum Einblenden (Zeit im geschnittenen Video):', ''];
+  for (const im of images) {
+    const name = safeName(im.name);
+    let dest;
+    if (im.path) { dest = path.join(dir, name + path.extname(im.path)); fs.copyFileSync(im.path, dest); }
+    else if (im.dataUrl) { dest = path.join(dir, name + (im.dataUrl.startsWith('data:image/png') ? '.png' : '.jpg')); fs.writeFileSync(dest, dataUrlToBuffer(im.dataUrl)); }
+    if (dest) lines.push(`${path.basename(dest)}: ab ${im.start.toFixed(1)} s für ${im.duration.toFixed(1)} s`);
+  }
+  lines.push('', 'So gehts in CapCut:', '1. Neues Projekt, das Video und die Bilder hineinziehen.', '2. Video auf die Zeitleiste, Bilder als Ebene darüber an die genannten Zeiten.', '3. Text > Untertitel importieren (Lokale Untertitel) > Untertitel.srt wählen.');
+  fs.writeFileSync(path.join(dir, 'Anleitung.txt'), lines.join('\r\n'), 'utf8');
+  shell.showItemInFolder(video);
+  const local = process.env.LOCALAPPDATA || '';
+  const candidates = [
+    path.join(local, 'CapCut', 'Apps', 'CapCut.exe'),
+    path.join(process.env.ProgramFiles || 'C:\\Program Files', 'CapCut', 'CapCut.exe'),
+    path.join(local, 'Programs', 'CapCut', 'CapCut.exe'),
+  ];
+  const exe = candidates.find((p) => p && fs.existsSync(p));
+  if (exe) { require('child_process').spawn(exe, [], { detached: true, stdio: 'ignore' }).unref(); return { launched: true, dir }; }
+  return { launched: false, dir };
 });
 ipcMain.handle('video:fileUrl', (_e, p) => require('url').pathToFileURL(p).href);

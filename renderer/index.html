@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob: file:; media-src 'self' file: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob: file: https://images.pexels.com; media-src 'self' file: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'">
 <title>Apologea Studio</title>
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -109,6 +109,7 @@
         <div><div class="eyebrow">III · Video-Cutter</div><h1>Rohvideo rein – TikTok raus</h1></div>
         <div class="head-actions">
           <button class="btn ghost" id="chooseVideo">Video wählen</button>
+          <button class="btn ghost" id="capcutExport" disabled title="Geschnittenes Video ohne Schrift, Untertitel-Datei und Bilder für CapCut">In CapCut bearbeiten</button>
           <button class="btn gold" id="renderVideo" disabled>Video erstellen</button>
         </div>
       </header>
@@ -160,12 +161,27 @@
               <option value="blur">9:16 TikTok – mit unscharfem Rand</option>
               <option value="orig">Originalformat behalten</option>
             </select>
+            <label class="lbl">Qualität</label>
+            <select id="vQuality">
+              <option value="hd">TikTok 1080p – gestochen scharf (empfohlen)</option>
+              <option value="max">Original-Auflösung (bis 4K, dauert länger)</option>
+            </select>
+            <p class="hint small-text" id="qualityHint"></p>
             <label class="check"><input type="checkbox" id="colorPop" checked> Farben kräftiger („Pop“)</label>
-            <label class="check"><input type="checkbox" id="audioNorm" checked> Lautstärke angleichen</label>
+            <label class="check"><input type="checkbox" id="denoise" checked> Rauschen im Ton entfernen</label>
+            <label class="check"><input type="checkbox" id="audioNorm" checked> Lautstärke auf TikTok-Norm</label>
             <label class="check"><input type="checkbox" id="watermark"> Apologea-Logo als Wasserzeichen</label>
-            <div class="lbl">Bilder einblenden</div>
+          </div>
+          <div class="panel">
+            <div class="panel-title"><span>Bilder einblenden</span></div>
+            <label class="check"><input type="checkbox" id="kenBurns" checked> Bilder langsam zoomen (Ken-Burns)</label>
             <div id="insertList" class="insert-list"></div>
-            <button class="btn ghost small" id="addInsert" disabled>+ Bild einblenden</button>
+            <div class="btn-row">
+              <button class="btn ghost small" id="brollSuggest" disabled>✦ KI-Vorschläge</button>
+              <button class="btn ghost small" id="stockSearch" disabled>Foto suchen</button>
+              <button class="btn ghost small" id="addInsert" disabled>+ Eigenes Bild</button>
+            </div>
+            <div id="brollList" class="broll-list"></div>
           </div>
         </div>
       </div>
@@ -235,6 +251,15 @@
           </div>
         </div>
         <div class="panel">
+          <div class="panel-title"><span>Pexels – Profi-Fotos für Videos</span><span class="badge">kostenlos</span></div>
+          <p class="small-text">Echte Fotos zum Einblenden im Video, kostenlos und auch für Werbung erlaubt:</p>
+          <ol class="small-text steps">
+            <li>Auf <a href="#" data-link="https://www.pexels.com/join">pexels.com/join</a> kostenlos registrieren.</li>
+            <li><a href="#" data-link="https://www.pexels.com/api/new/">pexels.com/api/new</a> öffnen, kurz ausfüllen (Zweck: „Videos für meine Modemarke“) und den Schlüssel kopieren.</li>
+          </ol>
+          <input type="password" id="pexelsKey" placeholder="Pexels-Schlüssel">
+        </div>
+        <div class="panel">
           <div class="panel-title"><span>Marke</span></div>
           <label class="lbl">Markenname</label>
           <input type="text" id="brand">
@@ -283,6 +308,20 @@
 </div>
 
 <!-- Prompt-Editor -->
+<div class="modal hidden" id="stockModal">
+  <div class="modal-box">
+    <div class="modal-head"><h3>Foto einblenden</h3><button class="btn ghost small" id="stClose">✕</button></div>
+    <div class="stock-bar">
+      <input type="text" id="stQuery" placeholder="Suchbegriff, am besten Englisch (z. B. orthodox church candles)">
+      <select id="stOrient"><option value="portrait">Hochkant</option><option value="">Alle</option><option value="landscape">Quer</option></select>
+      <button class="btn gold small" id="stGo">Suchen</button>
+      <button class="btn ghost small" id="stAi">✦ KI-Foto erstellen</button>
+    </div>
+    <p class="hint small-text" id="stInfo">Fotos von Pexels: kostenlos und auch für Werbung erlaubt. Klick ein Foto an, um es einzublenden.</p>
+    <div class="stock-grid" id="stGrid"></div>
+  </div>
+</div>
+
 <div class="modal hidden" id="promptModal">
   <div class="modal-box narrow">
     <div class="modal-head"><h3>Motiv anpassen</h3><button class="btn ghost small" id="prClose">✕</button></div>
