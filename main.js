@@ -227,8 +227,38 @@ function stockSource(s) {
   if (s.pixabayKey) return 'pixabay';
   return null;
 }
-ipcMain.handle('stock:search', async (_e, { query, orientation = 'portrait', page = 1 }) => {
+// Wikimedia Commons: alte Ikonen und Gemälde, nur gemeinfreie Dateien (kein Schlüssel nötig)
+const WIKI_UA = 'ApologeaStudio/1.3 (https://github.com/rfaelfox/apologea-studio)';
+async function searchCommons(query) {
+  const params = new URLSearchParams({
+    action: 'query', format: 'json', generator: 'search', gsrsearch: `${query} filetype:bitmap`, gsrnamespace: '6', gsrlimit: '40',
+    prop: 'imageinfo', iiprop: 'url|size|mime|extmetadata', iiurlwidth: '500', iiextmetadatafilter: 'LicenseShortName|Artist|ObjectName',
+  });
+  const res = await fetchWithTimeout(`https://commons.wikimedia.org/w/api.php?${params}`, { headers: { 'User-Agent': WIKI_UA } }, 30000);
+  if (!res.ok) throw new Error('Wikimedia: ' + (await errorText(res)));
+  const data = await res.json();
+  const strip = (h) => String(h || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  return Object.values(data.query?.pages || {})
+    .sort((a, b) => (a.index || 0) - (b.index || 0))
+    .map((p) => ({ p, ii: p.imageinfo?.[0] }))
+    .filter(({ ii }) => ii && /image\/(jpeg|png)/.test(ii.mime) && ii.width >= 900 && ii.height >= 900)
+    // nur wirklich freie Bilder: gemeinfrei oder CC0
+    .filter(({ ii }) => /public domain|^pd\b|^pd-|cc0/i.test(ii.extmetadata?.LicenseShortName?.value || ''))
+    .map(({ p, ii }) => {
+      const name = p.title.replace(/^File:/, '');
+      const big = ii.width > 3840 ? `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(name)}?width=3840` : ii.url;
+      const k = Math.min(1, 3840 / ii.width);
+      return {
+        source: 'commons', id: p.pageid, width: Math.round(ii.width * k), height: Math.round(ii.height * k),
+        alt: strip(ii.extmetadata?.ObjectName?.value) || name.replace(/\.[^.]+$/, ''),
+        photographer: strip(ii.extmetadata?.Artist?.value).slice(0, 60) || 'gemeinfrei',
+        thumb: ii.thumburl || ii.url, download: big, fallback: ii.url,
+      };
+    });
+}
+ipcMain.handle('stock:search', async (_e, { query, orientation = 'portrait', page = 1, source }) => {
   const s = loadSettings();
+  if (source === 'commons') return searchCommons(query);
   const src = stockSource(s);
   if (!src) throw new Error('Für die Fotosuche fehlt ein kostenloser Unsplash- oder Pixabay-Schlüssel (Einstellungen).');
   if (src === 'unsplash') {
@@ -272,8 +302,10 @@ ipcMain.handle('stock:fetch', async (_e, photo) => {
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, `${safeName(photo.source || 'foto')}-${safeName(String(photo.id))}.jpg`);
   if (!fs.existsSync(file)) {
-    const res = await fetchWithTimeout(photo.download, {}, 120000);
-    if (!res.ok) throw new Error('Foto konnte nicht geladen werden: ' + res.status);
+    let res = await fetchWithTimeout(photo.download, { headers: { 'User-Agent': WIKI_UA } }, 120000).catch(() => null);
+    // Falls die verkleinerte Fassung nicht klappt: Originaldatei laden
+    if ((!res || !res.ok || !/^image\//.test(res.headers.get('content-type') || '')) && photo.fallback) res = await fetchWithTimeout(photo.fallback, { headers: { 'User-Agent': WIKI_UA } }, 300000);
+    if (!res || !res.ok) throw new Error('Foto konnte nicht geladen werden: ' + (res ? res.status : 'keine Verbindung'));
     fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
     // Unsplash verlangt, dass Downloads gemeldet werden
     if (photo.source === 'unsplash' && photo.track) {

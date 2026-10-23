@@ -280,30 +280,40 @@ const Video = (() => {
 
   // ---------- Fotosuche (Unsplash / Pixabay / Pexels) ----------
   let stockCtx = null;
+  const hasPhotoKey = () => !!(App.settings.unsplashKey || App.settings.pixabayKey || App.settings.pexelsKey);
+  function stockInfo() {
+    const commons = $('#stSource').value === 'commons';
+    $('#stOrient').disabled = commons;
+    if (commons) return 'Alte Ikonen und Gemälde von Wikimedia Commons – nur gemeinfreie Werke, frei nutzbar. Suche am besten auf Englisch (z. B. „icon Christ Pantocrator“, „Rembrandt prodigal son“).';
+    if (!hasPhotoKey()) return 'Für echte Fotos brauchst du einen kostenlosen Unsplash- oder Pixabay-Schlüssel (Einstellungen, 2 Minuten). Ikonen & Gemälde und „✦ KI-Foto erstellen“ gehen auch ohne.';
+    return 'Kostenlose Profi-Fotos, frei nutzbar. Klick ein Foto an, um es einzublenden.';
+  }
   function openStock(ctx = {}) {
     stockCtx = ctx;
     $('#stQuery').value = ctx.query || '';
     $('#stGrid').innerHTML = '';
+    if (!hasPhotoKey()) $('#stSource').value = 'commons';
+    $('#stInfo').textContent = stockInfo();
     $('#stockModal').classList.remove('hidden');
-    if (!App.settings.unsplashKey && !App.settings.pixabayKey && !App.settings.pexelsKey) { $('#stInfo').textContent = 'Für die Fotosuche brauchst du einen kostenlosen Unsplash- oder Pixabay-Schlüssel (Einstellungen, 2 Minuten). „✦ KI-Foto erstellen“ geht auch ohne.'; return; }
-    $('#stInfo').textContent = 'Kostenlose Profi-Fotos, auch für Werbung erlaubt. Klick ein Foto an, um es einzublenden.';
     if (ctx.query) stockSearch();
     else $('#stQuery').focus();
   }
   async function stockSearch() {
     const q = $('#stQuery').value.trim();
-    if (!q) return;
+    if (!q) { $('#stInfo').textContent = stockInfo(); return; }
+    const source = $('#stSource').value;
+    if (source !== 'commons' && !hasPhotoKey()) { $('#stInfo').textContent = stockInfo(); return; }
     const grid = $('#stGrid'); grid.innerHTML = '';
     $('#stInfo').textContent = 'Suche läuft …';
     try {
-      const photos = await api.stockSearch({ query: q, orientation: $('#stOrient').value });
-      $('#stInfo').textContent = photos.length ? 'Klick ein Foto an, um es einzublenden.' : 'Nichts gefunden. Probier andere (englische) Begriffe.';
+      const photos = await api.stockSearch({ query: q, orientation: $('#stOrient').value, source });
+      $('#stInfo').textContent = photos.length ? 'Klick ein Bild an, um es einzublenden.' : 'Nichts gefunden. Probier andere (englische) Begriffe.';
       for (const p of photos) {
         const fig = el('figure', { title: p.alt, onclick: async () => {
           fig.style.opacity = '0.5';
           try {
             const file = await api.stockFetch(p);
-            await addInsert({ path: file, thumb: p.thumb, iw: p.width, ih: p.height, credit: `Foto: ${p.photographer} / ${p.source === 'unsplash' ? 'Unsplash' : p.source === 'pixabay' ? 'Pixabay' : 'Pexels'}`, mode: p.height >= p.width ? 'full' : 'card', ...(stockCtx?.at || {}) });
+            await addInsert({ path: file, thumb: p.thumb, iw: p.width, ih: p.height, credit: `Foto: ${p.photographer} / ${({ unsplash: 'Unsplash', pixabay: 'Pixabay', commons: 'Wikimedia Commons, gemeinfrei' })[p.source] || 'Pexels'}`, mode: p.height >= p.width ? 'full' : 'card', ...(stockCtx?.at || {}) });
             $('#stockModal').classList.add('hidden');
             toast('Foto ist eingefügt.');
           } catch (e) { fig.style.opacity = '1'; toast(errMsg(e), true); }
@@ -355,6 +365,7 @@ const Video = (() => {
     $('#stGo').addEventListener('click', stockSearch);
     $('#stQuery').addEventListener('keydown', (e) => { if (e.key === 'Enter') stockSearch(); });
     $('#stOrient').addEventListener('change', stockSearch);
+    $('#stSource').addEventListener('change', () => { $('#stInfo').textContent = stockInfo(); stockSearch(); });
     $('#stClose').addEventListener('click', () => $('#stockModal').classList.add('hidden'));
     $('#stAi').addEventListener('click', async () => {
       const prompt = stockCtx?.prompt || $('#stQuery').value.trim();

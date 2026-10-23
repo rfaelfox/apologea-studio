@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob: file: https://images.pexels.com https://images.unsplash.com https://pixabay.com https://cdn.pixabay.com; media-src 'self' file: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob: file: https://images.pexels.com https://images.unsplash.com https://pixabay.com https://cdn.pixabay.com https://upload.wikimedia.org; media-src 'self' file: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'">
 <title>Apologea Studio</title>
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -321,6 +321,7 @@
     <div class="modal-head"><h3>Foto einblenden</h3><button class="btn ghost small" id="stClose">✕</button></div>
     <div class="stock-bar">
       <input type="text" id="stQuery" placeholder="Suchbegriff, am besten Englisch (z. B. orthodox church candles)">
+      <select id="stSource"><option value="photo">Fotos</option><option value="commons">Ikonen &amp; Gemälde</option></select>
       <select id="stOrient"><option value="portrait">Hochkant</option><option value="">Alle</option><option value="landscape">Quer</option></select>
       <button class="btn gold small" id="stGo">Suchen</button>
       <button class="btn ghost small" id="stAi">✦ KI-Foto erstellen</button>
