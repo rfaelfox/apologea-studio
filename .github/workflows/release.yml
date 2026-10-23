@@ -1,8 +1,12 @@
 name: Windows-Version veröffentlichen
 
+# Läuft, sobald auf main die Version in package.json geändert wird.
+# electron-builder legt dabei das Release samt Tag v<version> selbst an.
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+    paths: [package.json]
+  workflow_dispatch:
 
 permissions:
   contents: write

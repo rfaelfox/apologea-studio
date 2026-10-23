@@ -19,5 +19,5 @@ Ergebnis: `dist/Apologea Studio Setup <version>.exe`.
 
 ## Neue Version veröffentlichen
 
-Version in `package.json` erhöhen, committen und einen Tag `v<version>` pushen.
+Version in `package.json` erhöhen, committen und nach `main` pushen.
 GitHub Actions baut dann den Installer und legt ihn als Release ab; das Programm findet ihn über „Nach Updates suchen“.
