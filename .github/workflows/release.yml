@@ -22,6 +22,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Installer bauen und als GitHub-Release hochladen
-        run: npx electron-builder --win --x64 --publish always -c.win.signAndEditExecutable=true
+        shell: bash
+        run: npx electron-builder --win --x64 --publish always --config.win.signAndEditExecutable=true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
