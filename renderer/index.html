@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob: file:; media-src 'self' file: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'">
+<title>Apologea Studio</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <img src="../assets/logo-cross.png" class="brand-cross" alt="">
+      <img src="../assets/logo-word.png" class="brand-word" alt="Apologea">
+      <div class="brand-sub">✦ STUDIO ✦</div>
+    </div>
+    <div class="ornament"></div>
+    <nav>
+      <button class="nav-item active" data-view="design"><span class="nav-glyph">☩</span><span>Design-Studio</span></button>
+      <button class="nav-item" data-view="archive"><span class="nav-glyph">❖</span><span>Archiv</span></button>
+      <button class="nav-item" data-view="video"><span class="nav-glyph">▶</span><span>Video-Cutter</span></button>
+      <button class="nav-item" data-view="settings"><span class="nav-glyph">⚙</span><span>Einstellungen</span></button>
+    </nav>
+    <div class="ornament"></div>
+    <div class="key-status" id="keyStatus"></div>
+    <div class="update-box">
+      <div class="update-msg" id="updateMsg"></div>
+      <button class="btn ghost small" id="updateBtn">Nach Updates suchen</button>
+      <div class="version" id="appVersion"></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- ================= DESIGN-STUDIO ================= -->
+    <section class="view active" id="view-design">
+      <header class="view-head">
+        <div>
+          <div class="eyebrow">I · Design-Studio</div>
+          <h1>Von der Idee zum fertigen Piece</h1>
+        </div>
+        <div class="head-actions">
+          <button class="btn ghost" id="newProject">Neues Projekt</button>
+          <button class="btn gold" id="saveProject" disabled>Kollektion speichern</button>
+        </div>
+      </header>
+
+      <div class="panel vision">
+        <div class="panel-title"><span>Deine Vision</span></div>
+        <textarea id="idea" rows="3" placeholder="z. B. Ein Hoodie über die Stille vor dem Sturm – Erzengel Michael, zerbrochene Mosaiksteine, Gold auf Schwarz …"></textarea>
+        <div class="vision-grid">
+          <div>
+            <label class="lbl">Kleidungsstücke</label>
+            <div class="chips" id="garmentChips"></div>
+          </div>
+          <div>
+            <label class="lbl">Stilrichtung <span class="hint">(optional)</span></label>
+            <div class="chips" id="styleChips"></div>
+          </div>
+          <div class="vision-sliders">
+            <label class="lbl">Kreativität <span class="val" id="creativityVal"></span></label>
+            <input type="range" id="creativity" min="0" max="3" step="1" value="2">
+            <label class="lbl">Anzahl Motive <span class="val" id="motifCountVal"></span></label>
+            <input type="range" id="motifCount" min="2" max="6" step="1" value="3">
+          </div>
+        </div>
+        <div class="vision-actions">
+          <button class="btn gold big" id="createConcept"><span>✦ Konzept erschaffen</span></button>
+          <span class="status" id="designStatus"></span>
+        </div>
+      </div>
+
+      <div id="conceptArea" class="hidden">
+        <div class="panel concept">
+          <div class="concept-head">
+            <div>
+              <div class="eyebrow">Kollektion</div>
+              <h2 id="cName" contenteditable="true" spellcheck="false"></h2>
+              <div class="tagline" id="cTagline" contenteditable="true" spellcheck="false"></div>
+            </div>
+            <div class="palette" id="cPalette"></div>
+          </div>
+          <p class="story" id="cStory" contenteditable="true"></p>
+          <div class="concept-meta">
+            <div><span class="lbl">Stimmung</span><div id="cMood" class="mood"></div></div>
+            <div><span class="lbl">Typografie & Details</span><div id="cTypo" class="small-text"></div></div>
+          </div>
+        </div>
+
+        <div class="section-title"><span>Motive</span><button class="btn ghost small" id="addMotif">+ Eigenes Motiv</button></div>
+        <div class="motif-grid" id="motifGrid"></div>
+
+        <div class="section-title"><span>Pieces – komplette Vorschau</span><button class="btn ghost small" id="addPiece">+ Piece hinzufügen</button></div>
+        <div class="piece-grid" id="pieceGrid"></div>
+      </div>
+    </section>
+
+    <!-- ================= ARCHIV ================= -->
+    <section class="view" id="view-archive">
+      <header class="view-head">
+        <div><div class="eyebrow">II · Archiv</div><h1>Gespeicherte Kollektionen</h1></div>
+        <div class="head-actions"><button class="btn ghost" id="openOutput">Ordner öffnen</button></div>
+      </header>
+      <div class="archive-grid" id="archiveGrid"></div>
+    </section>
+
+    <!-- ================= VIDEO ================= -->
+    <section class="view" id="view-video">
+      <header class="view-head">
+        <div><div class="eyebrow">III · Video-Cutter</div><h1>Rohvideo rein – TikTok raus</h1></div>
+        <div class="head-actions">
+          <button class="btn ghost" id="chooseVideo">Video wählen</button>
+          <button class="btn gold" id="renderVideo" disabled>Video erstellen</button>
+        </div>
+      </header>
+      <div class="video-layout">
+        <div class="video-left">
+          <div class="drop" id="videoDrop">
+            <div class="drop-inner">
+              <div class="drop-cross">☩</div>
+              <div>Video hierher ziehen<br><span class="hint">oder oben „Video wählen“</span></div>
+            </div>
+            <video id="videoPlayer" controls class="hidden"></video>
+          </div>
+          <div class="video-tabs hidden" id="videoTabs">
+            <button class="tab active" data-src="orig">Original</button>
+            <button class="tab" data-src="result" disabled>Ergebnis</button>
+            <button class="btn ghost small" id="showResult" disabled>Im Ordner zeigen</button>
+          </div>
+          <div class="progress hidden" id="videoProgress"><div class="bar"><i></i></div><span></span></div>
+          <div class="stats hidden" id="videoStats"></div>
+        </div>
+        <div class="video-right">
+          <div class="panel">
+            <div class="panel-title"><span>Schnitt</span></div>
+            <label class="lbl">Pausen kürzen ab <span class="val" id="pauseVal"></span></label>
+            <input type="range" id="maxPause" min="0.15" max="1.5" step="0.05" value="0.35">
+            <label class="check"><input type="checkbox" id="autoSlips" checked> Versprecher, Wiederholungen & „ähm“ automatisch entfernen</label>
+            <button class="btn ghost small" id="aiSlips" disabled>✦ KI-Versprecher-Check</button>
+            <label class="check"><input type="checkbox" id="jumpZoom" checked> Jump-Zoom bei jedem 2. Schnitt</label>
+          </div>
+          <div class="panel">
+            <div class="panel-title"><span>Untertitel</span></div>
+            <label class="check"><input type="checkbox" id="subsOn" checked> Untertitel einbrennen</label>
+            <div class="chips" id="subStyleChips"></div>
+            <div class="row2">
+              <div><label class="lbl">Wörter je Einblendung</label><select id="subWords"><option>1</option><option>2</option><option selected>3</option><option>4</option></select></div>
+              <div><label class="lbl">Position</label><select id="subPos"><option value="low">Unten</option><option value="mid" selected>Mitte</option><option value="high">Oben</option></select></div>
+            </div>
+            <label class="lbl">Größe <span class="val" id="subSizeVal"></span></label>
+            <input type="range" id="subSize" min="60" max="160" step="5" value="100">
+            <label class="check"><input type="checkbox" id="subUpper" checked> GROSSBUCHSTABEN</label>
+            <label class="lbl">Hook-Text am Anfang <span class="hint">(optional, 3 Sek.)</span></label>
+            <input type="text" id="hookText" placeholder="z. B. Das hat mir keiner gesagt …">
+          </div>
+          <div class="panel">
+            <div class="panel-title"><span>Format & Effekte</span></div>
+            <label class="lbl">Format</label>
+            <select id="vFormat">
+              <option value="fill">9:16 TikTok – Bild füllen</option>
+              <option value="blur">9:16 TikTok – mit unscharfem Rand</option>
+              <option value="orig">Originalformat behalten</option>
+            </select>
+            <label class="check"><input type="checkbox" id="colorPop" checked> Farben kräftiger („Pop“)</label>
+            <label class="check"><input type="checkbox" id="audioNorm" checked> Lautstärke angleichen</label>
+            <label class="check"><input type="checkbox" id="watermark"> Apologea-Logo als Wasserzeichen</label>
+            <div class="lbl">Bilder einblenden</div>
+            <div id="insertList" class="insert-list"></div>
+            <button class="btn ghost small" id="addInsert" disabled>+ Bild einblenden</button>
+          </div>
+        </div>
+      </div>
+      <div class="panel transcript hidden" id="transcriptPanel">
+        <div class="panel-title"><span>Gesprochener Text</span><span class="hint">Klick auf ein Wort = rausschneiden / behalten. Doppelklick = dorthin springen.</span></div>
+        <div id="transcript" class="transcript-words"></div>
+      </div>
+    </section>
+
+    <!-- ================= EINSTELLUNGEN ================= -->
+    <section class="view" id="view-settings">
+      <header class="view-head">
+        <div><div class="eyebrow">IV · Einstellungen</div><h1>Schlüssel & Marke</h1></div>
+        <div class="head-actions"><button class="btn gold" id="saveSettings">Speichern</button></div>
+      </header>
+      <div class="settings-grid">
+        <div class="panel">
+          <div class="panel-title"><span>Groq – Text-KI & Spracherkennung</span><span class="badge">kostenlos</span></div>
+          <p class="small-text">Wird für die Konzepte und für den Video-Cutter gebraucht. So bekommst du ihn (2 Minuten, ohne Kreditkarte):</p>
+          <ol class="small-text steps">
+            <li>Auf <a href="#" data-link="https://console.groq.com/keys">console.groq.com/keys</a> mit Google oder E-Mail anmelden.</li>
+            <li>„Create API Key“ klicken, einen Namen eingeben (z. B. Apologea).</li>
+            <li>Den Schlüssel (beginnt mit <code>gsk_</code>) kopieren und hier einfügen.</li>
+          </ol>
+          <input type="password" id="groqKey" placeholder="gsk_…">
+        </div>
+        <div class="panel">
+          <div class="panel-title"><span>Cloudflare – Bild-KI</span><span class="badge">kostenlos</span></div>
+          <p class="small-text">Malt deine Motive (ca. 200 Bilder pro Tag gratis, ohne Kreditkarte):</p>
+          <ol class="small-text steps">
+            <li>Auf <a href="#" data-link="https://dash.cloudflare.com/sign-up">dash.cloudflare.com</a> kostenlos registrieren.</li>
+            <li>Links „AI“ → „Workers AI“ öffnen, dann „REST API verwenden“ / „Use REST API“.</li>
+            <li>„Workers AI API-Token erstellen“ klicken und den Token kopieren. Die <b>Konto-ID</b> steht auf derselben Seite.</li>
+          </ol>
+          <input type="text" id="cfAccountId" placeholder="Konto-ID (Account ID)">
+          <input type="password" id="cfToken" placeholder="API-Token">
+          <label class="lbl">Bild-Dienst</label>
+          <select id="imageProvider">
+            <option value="cloudflare">Cloudflare FLUX (empfohlen, kostenlos)</option>
+            <option value="openai">OpenAI GPT Image (Premium, kostet pro Bild)</option>
+            <option value="huggingface">Hugging Face FLUX (Token, kleines Gratis-Kontingent)</option>
+            <option value="pollinations">Pollinations (Schlüssel von enter.pollinations.ai)</option>
+          </select>
+          <input type="password" id="hfToken" placeholder="Hugging Face Token (nur falls gewählt, hf_…)">
+          <input type="password" id="pollinationsKey" placeholder="Pollinations-Schlüssel (nur falls gewählt, sk_…)">
+        </div>
+        <div class="panel">
+          <div class="panel-title"><span>OpenAI – Premium-Bilder</span><span class="badge">optional · kostet</span></div>
+          <p class="small-text">OpenAIs beste Bild-KI. Mit Schlüssel erscheint bei jedem Motiv der Knopf „✦ Premium“: Dann wird nur dieses Motiv bei OpenAI gemalt, mit echtem transparentem Hintergrund. Hohe Qualität kostet ca. 5 Cent pro Bild.</p>
+          <p class="small-text">Wichtig: Das ChatGPT-Abo zählt hier nicht. Du brauchst einen eigenen Zugang:</p>
+          <ol class="small-text steps">
+            <li>Auf <a href="#" data-link="https://platform.openai.com/settings/organization/billing/overview">platform.openai.com</a> anmelden und unter „Billing“ Guthaben aufladen (z. B. 5 $).</li>
+            <li>Unter <a href="#" data-link="https://platform.openai.com/api-keys">API keys</a> „Create new secret key“ klicken und den Schlüssel (beginnt mit <code>sk-</code>) kopieren.</li>
+          </ol>
+          <input type="password" id="openaiKey" placeholder="OpenAI-Schlüssel (sk-…)">
+          <div class="row2">
+            <div><label class="lbl">Modell</label><select id="openaiModel">
+              <option value="gpt-image-2.5-sunburst">GPT Image 2.5 Sunburst (beste Details)</option>
+              <option value="gpt-image-2.5-flare">GPT Image 2.5 Flare (schneller)</option>
+              <option value="gpt-image-2">GPT Image 2</option>
+            </select></div>
+            <div><label class="lbl">Qualität</label><select id="openaiQuality">
+              <option value="high">Hoch (~5 Cent)</option>
+              <option value="medium">Mittel (~1–2 Cent)</option>
+              <option value="low">Niedrig (unter 1 Cent)</option>
+            </select></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title"><span>Marke</span></div>
+          <label class="lbl">Markenname</label>
+          <input type="text" id="brand">
+          <label class="lbl">Markenstil – das liest die KI bei jedem Konzept mit</label>
+          <textarea id="brandDescription" rows="4"></textarea>
+          <label class="lbl">Sprache deiner Videos</label>
+          <select id="language"><option value="de">Deutsch</option><option value="en">Englisch</option><option value="">Automatisch erkennen</option></select>
+        </div>
+        <div class="panel">
+          <div class="panel-title"><span>Speicherort</span></div>
+          <p class="small-text">Hier landen deine Kollektionen und fertigen Videos.</p>
+          <div class="path-row"><code id="outputDirLabel"></code><button class="btn ghost small" id="pickOutput">Ändern</button></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Piece-Editor -->
+<div class="modal hidden" id="pieceModal">
+  <div class="modal-box">
+    <div class="modal-head"><h3 id="pmTitle" contenteditable="true" spellcheck="false"></h3><button class="btn ghost small" id="pmClose">Schließen ✕</button></div>
+    <div class="modal-body">
+      <div class="pm-canvas-wrap"><canvas id="pmCanvas" width="1000" height="1000"></canvas><div class="hint center">Motiv mit der Maus verschieben · Mausrad = Größe</div></div>
+      <div class="pm-controls">
+        <label class="lbl">Kleidungsstück</label><select id="pmGarment"></select>
+        <label class="lbl">Ansicht</label>
+        <div class="seg" id="pmView"><button data-v="front" class="active">Vorne</button><button data-v="back">Hinten</button></div>
+        <label class="lbl">Stofffarbe</label><div class="swatches" id="pmColors"></div>
+        <input type="color" id="pmColorPick">
+        <label class="lbl">Motiv</label><div class="pm-motifs" id="pmMotifs"></div>
+        <label class="lbl">Platzierung</label><select id="pmPlacement"></select>
+        <label class="lbl">Druckfarbe</label>
+        <div class="seg" id="pmInk"><button data-v="original" class="active">Original</button><button data-v="gold">Goldfolie</button><button data-v="white">Weiß</button><button data-v="black">Schwarz</button></div>
+        <label class="lbl">Größe</label><input type="range" id="pmScale" min="0.3" max="1.8" step="0.02" value="1">
+        <label class="check"><input type="checkbox" id="pmRemoveBg" checked> Hintergrund vom Motiv entfernen</label>
+        <label class="lbl">Entfern-Stärke</label><input type="range" id="pmTol" min="5" max="120" step="1" value="48">
+        <div class="pm-actions">
+          <button class="btn ghost" id="pmReset">Zentrieren</button>
+          <button class="btn ghost" id="pmDelete">Löschen</button>
+          <button class="btn gold" id="pmExport">Als Bild speichern</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Prompt-Editor -->
+<div class="modal hidden" id="promptModal">
+  <div class="modal-box narrow">
+    <div class="modal-head"><h3>Motiv anpassen</h3><button class="btn ghost small" id="prClose">✕</button></div>
+    <label class="lbl">Titel</label><input type="text" id="prTitle">
+    <label class="lbl">Was soll drauf sein? <span class="hint">(darfst du auf Deutsch schreiben – die KI übersetzt)</span></label>
+    <textarea id="prText" rows="6"></textarea>
+    <div class="pm-actions"><button class="btn gold" id="prApply">✦ Neu erschaffen</button></div>
+  </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
+<script src="js/util.js"></script>
+<script src="js/mockups.js"></script>
+<script src="js/cutlogic.js"></script>
+<script src="js/app.js"></script>
+<script src="js/design.js"></script>
+<script src="js/video.js"></script>
+</body>
+</html>

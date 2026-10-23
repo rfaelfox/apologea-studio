@@ -1,0 +1,32 @@
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
+
+const call = (ch) => (args) => ipcRenderer.invoke(ch, args);
+
+contextBridge.exposeInMainWorld('api', {
+  getSettings: call('settings:get'),
+  fontData: call('app:font'),
+  setSettings: call('settings:set'),
+  chat: call('ai:chat'),
+  generateImage: call('img:generate'),
+  openFile: call('dialog:open'),
+  pickFolder: call('dialog:folder'),
+  readDataUrl: call('file:readDataUrl'),
+  saveProject: call('project:save'),
+  listProjects: call('project:list'),
+  loadProject: call('project:load'),
+  openExternal: call('app:openExternal'),
+  openPath: call('app:openPath'),
+  copyText: call('app:copy'),
+  showItem: call('app:showItem'),
+  probeVideo: call('video:probe'),
+  analyzeVideo: call('video:analyze'),
+  renderVideo: call('video:render'),
+  fileUrl: call('video:fileUrl'),
+  pathForFile: (file) => webUtils.getPathForFile(file),
+  appVersion: call('app:version'),
+  checkUpdate: call('update:check'),
+  downloadUpdate: call('update:download'),
+  installUpdate: call('update:install'),
+  onUpdateStatus: (fn) => ipcRenderer.on('update:status', (_e, s) => fn(s)),
+  onVideoStatus: (fn) => ipcRenderer.on('video:status', (_e, s) => fn(s)),
+});
