@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob: file: https://images.pexels.com; media-src 'self' file: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob: file: https://images.pexels.com https://images.unsplash.com https://pixabay.com https://cdn.pixabay.com; media-src 'self' file: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'">
 <title>Apologea Studio</title>
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -251,13 +251,21 @@
           </div>
         </div>
         <div class="panel">
-          <div class="panel-title"><span>Pexels – Profi-Fotos für Videos</span><span class="badge">kostenlos</span></div>
-          <p class="small-text">Echte Fotos zum Einblenden im Video, kostenlos und auch für Werbung erlaubt:</p>
+          <div class="panel-title"><span>Fotos für Videos</span><span class="badge">kostenlos</span></div>
+          <p class="small-text">Echte Profi-Fotos zum Einblenden, kostenlos und auch für Werbung erlaubt. Ein Schlüssel reicht, Unsplash hat die schärfsten Bilder.</p>
+          <p class="small-text"><b>Unsplash</b> (empfohlen):</p>
           <ol class="small-text steps">
-            <li>Auf <a href="#" data-link="https://www.pexels.com/join">pexels.com/join</a> kostenlos registrieren.</li>
-            <li><a href="#" data-link="https://www.pexels.com/api/new/">pexels.com/api/new</a> öffnen, kurz ausfüllen (Zweck: „Videos für meine Modemarke“) und den Schlüssel kopieren.</li>
+            <li>Auf <a href="#" data-link="https://unsplash.com/join">unsplash.com/join</a> kostenlos registrieren.</li>
+            <li><a href="#" data-link="https://unsplash.com/oauth/applications/new">unsplash.com/oauth/applications/new</a> öffnen, alle Haken setzen, „Accept terms“, als Name z. B. „Apologea Studio“ eintragen.</li>
+            <li>Auf der nächsten Seite den <b>Access Key</b> kopieren.</li>
           </ol>
-          <input type="password" id="pexelsKey" placeholder="Pexels-Schlüssel">
+          <input type="password" id="unsplashKey" placeholder="Unsplash Access Key">
+          <p class="small-text"><b>Pixabay</b> (Alternative):</p>
+          <ol class="small-text steps">
+            <li>Auf <a href="#" data-link="https://pixabay.com/accounts/register/">pixabay.com</a> kostenlos registrieren.</li>
+            <li><a href="#" data-link="https://pixabay.com/api/docs/">pixabay.com/api/docs</a> öffnen. Unter „Parameters“ steht grün „Your API key“. Den kopieren.</li>
+          </ol>
+          <input type="password" id="pixabayKey" placeholder="Pixabay API-Schlüssel">
         </div>
         <div class="panel">
           <div class="panel-title"><span>Marke</span></div>
@@ -317,7 +325,7 @@
       <button class="btn gold small" id="stGo">Suchen</button>
       <button class="btn ghost small" id="stAi">✦ KI-Foto erstellen</button>
     </div>
-    <p class="hint small-text" id="stInfo">Fotos von Pexels: kostenlos und auch für Werbung erlaubt. Klick ein Foto an, um es einzublenden.</p>
+    <p class="hint small-text" id="stInfo">Kostenlose Profi-Fotos, auch für Werbung erlaubt. Klick ein Foto an, um es einzublenden.</p>
     <div class="stock-grid" id="stGrid"></div>
   </div>
 </div>

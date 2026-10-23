@@ -21,12 +21,12 @@ const App = {
   },
   fillSettings() {
     const s = this.settings;
-    for (const k of ['groqKey', 'cfAccountId', 'cfToken', 'openaiKey', 'openaiModel', 'openaiQuality', 'pexelsKey', 'pollinationsKey', 'hfToken', 'brand', 'brandDescription', 'imageProvider', 'language']) $('#' + k).value = s[k] ?? '';
+    for (const k of ['groqKey', 'cfAccountId', 'cfToken', 'openaiKey', 'openaiModel', 'openaiQuality', 'unsplashKey', 'pixabayKey', 'pollinationsKey', 'hfToken', 'brand', 'brandDescription', 'imageProvider', 'language']) $('#' + k).value = s[k] ?? '';
     $('#outputDirLabel').textContent = s.resolvedOutputDir;
   },
   async saveSettings() {
     const data = {};
-    for (const k of ['groqKey', 'cfAccountId', 'cfToken', 'openaiKey', 'openaiModel', 'openaiQuality', 'pexelsKey', 'pollinationsKey', 'hfToken', 'brand', 'brandDescription', 'imageProvider', 'language']) data[k] = $('#' + k).value.trim();
+    for (const k of ['groqKey', 'cfAccountId', 'cfToken', 'openaiKey', 'openaiModel', 'openaiQuality', 'unsplashKey', 'pixabayKey', 'pollinationsKey', 'hfToken', 'brand', 'brandDescription', 'imageProvider', 'language']) data[k] = $('#' + k).value.trim();
     await api.setSettings(data);
     await this.refreshSettings();
     toast('Gespeichert ✦');

@@ -235,7 +235,7 @@ const Video = (() => {
       const total = segments().reduce((a, [s, e]) => a + e - s, 0);
       const count = Math.max(2, Math.min(8, Math.round(total / 9)));
       const txt = await api.chat({ json: true, temperature: 0.6, maxTokens: 2500, messages: [
-        { role: 'system', content: `Du bist Cutter für hochwertige TikTok-Videos der Modemarke ${App.settings.brand || 'Apologea'} (${App.settings.brandDescription || ''}). Du bekommst nummerierte Wörter eines gesprochenen Videos. Wähle ${count} Stellen, an denen ein eingeblendetes Bild (B-Roll) das Gesagte stark unterstreicht: konkrete Dinge, Orte, Gefühle, Beispiele. Nicht im ersten Satz (Hook), nicht zu dicht hintereinander. Antworte nur mit JSON: {"items":[{"word":Nummer des Wortes, bei dem das Bild startet,"seconds":2 bis 3.5,"why":"kurz auf Deutsch, was gezeigt wird","search":"2-4 englische Suchbegriffe für ein Stockfoto","prompt":"englische Beschreibung eines realistischen Fotos dieser Szene, hochkant, cinematic, passend zur Marke"}]}` },
+        { role: 'system', content: `Du bist Cutter für einen christlichen TikTok-Kanal. Dort geht es um Glauben, Bibel, Gebet und die orthodoxe Tradition. Die Bilder sollen würdig, ruhig und hochwertig wirken. Du bekommst nummerierte Wörter eines gesprochenen Videos. Wähle ${count} Stellen, an denen ein eingeblendetes Bild (B-Roll) das Gesagte stark unterstreicht: konkrete Dinge, Orte, biblische Szenen als Landschaft oder Symbol, Gefühle, Beispiele aus dem Alltag. Bevorzuge echte Motive wie Kirchen, Ikonen, Kerzen, Bibeln, Kreuze, Natur, Menschen im Gebet. Jesus, Maria und Heilige nicht als KI-Personen darstellen, sondern über Ikonen, Symbole oder Orte. Nicht im ersten Satz (Hook), nicht zu dicht hintereinander. Antworte nur mit JSON: {"items":[{"word":Nummer des Wortes, bei dem das Bild startet,"seconds":2 bis 3.5,"why":"kurz auf Deutsch, was gezeigt wird","search":"2-4 englische Suchbegriffe für ein Stockfoto","prompt":"englische Beschreibung eines realistischen Fotos dieser Szene, hochkant, cinematic, warmes Licht"}]}` },
         { role: 'user', content: text }] });
       const items = (parseJsonLoose(txt).items || []).filter((x) => st.words[+x.word]);
       renderBroll(items);
@@ -278,15 +278,15 @@ const Video = (() => {
     progress(null);
   }
 
-  // ---------- Fotosuche (Pexels) ----------
+  // ---------- Fotosuche (Unsplash / Pixabay / Pexels) ----------
   let stockCtx = null;
   function openStock(ctx = {}) {
     stockCtx = ctx;
     $('#stQuery').value = ctx.query || '';
     $('#stGrid').innerHTML = '';
     $('#stockModal').classList.remove('hidden');
-    if (!App.settings.pexelsKey) { $('#stInfo').textContent = 'Für die Fotosuche brauchst du den kostenlosen Pexels-Schlüssel (Einstellungen, 1 Minute). „✦ KI-Foto erstellen“ geht auch ohne.'; return; }
-    $('#stInfo').textContent = 'Fotos von Pexels: kostenlos und auch für Werbung erlaubt. Klick ein Foto an, um es einzublenden.';
+    if (!App.settings.unsplashKey && !App.settings.pixabayKey && !App.settings.pexelsKey) { $('#stInfo').textContent = 'Für die Fotosuche brauchst du einen kostenlosen Unsplash- oder Pixabay-Schlüssel (Einstellungen, 2 Minuten). „✦ KI-Foto erstellen“ geht auch ohne.'; return; }
+    $('#stInfo').textContent = 'Kostenlose Profi-Fotos, auch für Werbung erlaubt. Klick ein Foto an, um es einzublenden.';
     if (ctx.query) stockSearch();
     else $('#stQuery').focus();
   }
@@ -303,7 +303,7 @@ const Video = (() => {
           fig.style.opacity = '0.5';
           try {
             const file = await api.stockFetch(p);
-            await addInsert({ path: file, thumb: p.thumb, iw: p.width, ih: p.height, credit: `Foto: ${p.photographer} / Pexels`, mode: p.height >= p.width ? 'full' : 'card', ...(stockCtx?.at || {}) });
+            await addInsert({ path: file, thumb: p.thumb, iw: p.width, ih: p.height, credit: `Foto: ${p.photographer} / ${p.source === 'unsplash' ? 'Unsplash' : p.source === 'pixabay' ? 'Pixabay' : 'Pexels'}`, mode: p.height >= p.width ? 'full' : 'card', ...(stockCtx?.at || {}) });
             $('#stockModal').classList.add('hidden');
             toast('Foto ist eingefügt.');
           } catch (e) { fig.style.opacity = '1'; toast(errMsg(e), true); }

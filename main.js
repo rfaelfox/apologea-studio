@@ -21,6 +21,8 @@ const DEFAULT_SETTINGS = {
   openaiModel: 'gpt-image-2.5-sunburst',
   openaiQuality: 'high',
   pexelsKey: '',
+  unsplashKey: '',
+  pixabayKey: '',
   imageModel: 'black-forest-labs/flux.1-schnell',
   textModel: 'llama-3.3-70b-versatile',
   brand: 'Apologea',
@@ -217,30 +219,67 @@ ipcMain.handle('img:generate', (_e, args) => queueImage(async () => {
   return `data:${type};base64,${buf.toString('base64')}`;
 }));
 
-// ---------- Stockfotos (Pexels: kostenlos, auch für Werbung erlaubt) ----------
+// ---------- Stockfotos (kostenlos, auch für Werbung erlaubt) ----------
+// Unsplash liefert die größten Bilder, Pixabay klappt ohne Freischaltung, Pexels nur mit altem Schlüssel
+function stockSource(s) {
+  if (s.unsplashKey) return 'unsplash';
+  if (s.pexelsKey) return 'pexels';
+  if (s.pixabayKey) return 'pixabay';
+  return null;
+}
 ipcMain.handle('stock:search', async (_e, { query, orientation = 'portrait', page = 1 }) => {
   const s = loadSettings();
-  if (!s.pexelsKey) throw new Error('Für die Fotosuche fehlt der kostenlose Pexels-Schlüssel (Einstellungen).');
-  const params = new URLSearchParams({ query, per_page: '15', page: String(page) });
-  if (orientation) params.set('orientation', orientation);
-  const res = await fetchWithTimeout(`https://api.pexels.com/v1/search?${params}`, { headers: { Authorization: s.pexelsKey } }, 30000);
-  if (!res.ok) throw new Error('Pexels: ' + (await errorText(res)));
+  const src = stockSource(s);
+  if (!src) throw new Error('Für die Fotosuche fehlt ein kostenloser Unsplash- oder Pixabay-Schlüssel (Einstellungen).');
+  if (src === 'unsplash') {
+    const params = new URLSearchParams({ query, per_page: '20', page: String(page), content_filter: 'high' });
+    if (orientation) params.set('orientation', orientation);
+    const res = await fetchWithTimeout(`https://api.unsplash.com/search/photos?${params}`, { headers: { Authorization: `Client-ID ${s.unsplashKey}`, 'Accept-Version': 'v1' } }, 30000);
+    if (!res.ok) throw new Error('Unsplash: ' + (await errorText(res)));
+    const data = await res.json();
+    return (data.results || []).map((p) => ({
+      source: 'unsplash', id: p.id, width: p.width, height: p.height, alt: p.alt_description || p.description || '', photographer: p.user?.name || '',
+      thumb: p.urls?.small, download: `${p.urls?.raw}&fm=jpg&q=88&${p.height >= p.width ? 'w=2400' : 'h=3400'}`, track: p.links?.download_location,
+    }));
+  }
+  if (src === 'pexels') {
+    const params = new URLSearchParams({ query, per_page: '20', page: String(page) });
+    if (orientation) params.set('orientation', orientation);
+    const res = await fetchWithTimeout(`https://api.pexels.com/v1/search?${params}`, { headers: { Authorization: s.pexelsKey } }, 30000);
+    if (!res.ok) throw new Error('Pexels: ' + (await errorText(res)));
+    const data = await res.json();
+    return (data.photos || []).map((p) => ({
+      source: 'pexels', id: p.id, width: p.width, height: p.height, alt: p.alt || '', photographer: p.photographer || '',
+      thumb: p.src?.medium || p.src?.small, download: `${p.src?.original}?auto=compress&cs=tinysrgb&${p.height >= p.width ? 'w=2400' : 'h=3400'}`,
+    }));
+  }
+  const params = new URLSearchParams({ key: s.pixabayKey, q: query.slice(0, 100), image_type: 'photo', per_page: '20', page: String(page), safesearch: 'true' });
+  params.set('orientation', orientation === 'portrait' ? 'vertical' : orientation === 'landscape' ? 'horizontal' : 'all');
+  const res = await fetchWithTimeout(`https://pixabay.com/api/?${params}`, {}, 30000);
+  if (!res.ok) throw new Error('Pixabay: ' + (await errorText(res)));
   const data = await res.json();
-  return (data.photos || []).map((p) => ({
-    id: p.id, width: p.width, height: p.height, alt: p.alt || '', photographer: p.photographer || '',
-    thumb: p.src?.medium || p.src?.small, original: p.src?.original, page: p.url,
-  }));
+  return (data.hits || []).map((p) => {
+    // Pixabay gibt höchstens 1280 px heraus – die echte Bildgröße passend herunterrechnen
+    const k = Math.min(1, 1280 / Math.max(p.imageWidth || 1280, p.imageHeight || 1280));
+    return {
+      source: 'pixabay', id: p.id, width: Math.round((p.imageWidth || 1280) * k), height: Math.round((p.imageHeight || 1280) * k), alt: p.tags || '', photographer: p.user || '',
+      thumb: p.webformatURL, download: p.largeImageURL,
+    };
+  });
 });
 ipcMain.handle('stock:fetch', async (_e, photo) => {
   const dir = path.join(app.getPath('userData'), 'media');
   fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, `pexels-${Number(photo.id) || Date.now()}.jpg`);
+  const file = path.join(dir, `${safeName(photo.source || 'foto')}-${safeName(String(photo.id))}.jpg`);
   if (!fs.existsSync(file)) {
-    // Groß genug für 4K-Vollbild, aber nicht die riesige Originaldatei
-    const size = photo.height >= photo.width ? 'w=2400' : 'h=3400';
-    const res = await fetchWithTimeout(`${photo.original}?auto=compress&cs=tinysrgb&${size}`, {}, 120000);
+    const res = await fetchWithTimeout(photo.download, {}, 120000);
     if (!res.ok) throw new Error('Foto konnte nicht geladen werden: ' + res.status);
     fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+    // Unsplash verlangt, dass Downloads gemeldet werden
+    if (photo.source === 'unsplash' && photo.track) {
+      const s = loadSettings();
+      fetchWithTimeout(photo.track, { headers: { Authorization: `Client-ID ${s.unsplashKey}` } }, 15000).catch(() => {});
+    }
   }
   return file;
 });
